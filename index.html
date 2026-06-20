@@ -1,0 +1,1524 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>대학 카공 지도 - 내 위치 주변 대학교 카페 찾기</title>
+    <!-- OpenStreetMap Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Pretendard Web Font -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+    <style>
+        :root {
+            --primary-color: #9E1B32; /* 고려대학교 크림슨 Red */
+            --primary-hover: #7A1224;
+            --accent-gold: #D4AF37;   /* 골드 포인트 */
+            --dark-charcoal: #1a1a1a;
+            --text-dark: #2d3748;
+            --text-light: #718096;
+            --bg-gray: #f7fafc;
+            --border-color: #e2e8f0;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+            
+            /* Tag Colors */
+            --color-plug-bg: #fffaf0;
+            --color-plug-text: #c05621;
+            --color-plug-border: #fbd38d;
+            
+            --color-quiet-bg: #f0fff4;
+            --color-quiet-text: #22543d;
+            --color-quiet-border: #9ae6b4;
+            
+            --color-open-bg: #faf5ff;
+            --color-open-text: #553c9a;
+            --color-open-border: #d6bcfa;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body, html {
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-gray);
+            color: var(--text-dark);
+        }
+
+        /* 1. 헤더 영역 */
+        header {
+            background: linear-gradient(135deg, var(--dark-charcoal) 0%, #2d1015 100%);
+            color: white;
+            padding: 18px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--shadow-md);
+            z-index: 1010;
+            border-bottom: 3px solid var(--primary-color);
+        }
+        
+        .header-title-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-badge {
+            background: var(--primary-color);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-weight: 800;
+            font-size: 14px;
+            letter-spacing: 0.5px;
+            box-shadow: 0 0 10px rgba(158, 27, 50, 0.4);
+            border: 1px solid rgba(255,255,255,0.2);
+            white-space: nowrap;
+            max-width: 130px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        header h1 {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        header h1 span {
+            color: var(--accent-gold);
+            font-weight: 800;
+        }
+
+        .gps-status {
+            font-size: 13px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 6px 14px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #cbd5e0;
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: all 0.3s;
+        }
+
+        .gps-status.active {
+            background: rgba(46, 204, 113, 0.15);
+            color: #2ecc71;
+            border-color: rgba(46, 204, 113, 0.3);
+            font-weight: 600;
+        }
+
+        /* 2. 컨트롤 영역 (검색 및 필터) */
+        .controls-panel {
+            background: white;
+            padding: 14px 24px;
+            box-shadow: var(--shadow-sm);
+            z-index: 1009;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .search-row {
+            display: flex;
+            gap: 12px;
+            width: 100%;
+        }
+
+        .search-wrapper {
+            position: relative;
+            flex-grow: 1;
+        }
+
+        .search-wrapper i {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-light);
+            font-size: 16px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 16px 12px 44px;
+            border-radius: 12px;
+            border: 1.5px solid var(--border-color);
+            font-size: 14px;
+            transition: all 0.2s;
+            outline: none;
+            background-color: var(--bg-gray);
+        }
+
+        .search-input:focus {
+            border-color: var(--primary-color);
+            background-color: white;
+            box-shadow: 0 0 0 3px rgba(158, 27, 50, 0.1);
+        }
+
+        .filter-row {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            scrollbar-width: none; /* Firefox */
+            padding-bottom: 2px;
+            align-items: center;
+        }
+
+        .filter-row::-webkit-scrollbar {
+            display: none; /* Chrome, Safari, Opera */
+        }
+
+        .filter-btn {
+            background: var(--bg-gray);
+            color: var(--text-dark);
+            border: 1.5px solid var(--border-color);
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 13.5px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .filter-btn:hover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+            background-color: rgba(158, 27, 50, 0.02);
+        }
+
+        .filter-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+            box-shadow: 0 4px 10px rgba(158, 27, 50, 0.25);
+        }
+
+        .univ-search-btn {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #bd1b3a 100%);
+            color: white !important;
+            border-color: var(--primary-color) !important;
+            box-shadow: var(--shadow-sm);
+            margin-left: auto; /* 데스크톱에서 우측 배치 */
+        }
+        
+        .univ-search-btn:hover {
+            background: var(--primary-hover) !important;
+            transform: scale(1.02);
+        }
+
+        /* 3. 메인 콘텐츠 컨테이너 (사이드바 & 지도) */
+        .main-container {
+            display: flex;
+            flex-grow: 1;
+            width: 100%;
+            height: calc(100% - 145px); /* Header + Controls panel height dynamic fallback */
+            position: relative;
+        }
+
+        /* 사이드바 */
+        #sidebar {
+            width: 380px;
+            background: white;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            z-index: 1002;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        .sidebar-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            background: #fff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sidebar-header span {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        .sidebar-header .count-badge {
+            background: rgba(158, 27, 50, 0.1);
+            color: var(--primary-color);
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .cafe-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .cafe-item {
+            padding: 16px;
+            border-radius: 14px;
+            border: 1px solid var(--border-color);
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .cafe-item:hover {
+            border-color: var(--primary-color);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+
+        .cafe-item.active-item {
+            border-color: var(--primary-color);
+            background-color: rgba(158, 27, 50, 0.01);
+            box-shadow: 0 0 0 2px rgba(158, 27, 50, 0.1);
+        }
+
+        .cafe-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .cafe-item-name {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--dark-charcoal);
+        }
+
+        .cafe-item-time {
+            font-size: 12px;
+            color: var(--primary-color);
+            background: rgba(158, 27, 50, 0.05);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: 600;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .cafe-item-review {
+            font-size: 13.5px;
+            color: var(--text-light);
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .cafe-item-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        /* 미니 태그 스타일 */
+        .tag-mini {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 6px;
+            border: 1px solid transparent;
+        }
+
+        .tag-mini.plug {
+            background: var(--color-plug-bg);
+            color: var(--color-plug-text);
+            border-color: var(--color-plug-border);
+        }
+
+        .tag-mini.quiet {
+            background: var(--color-quiet-bg);
+            color: var(--color-quiet-text);
+            border-color: var(--color-quiet-border);
+        }
+
+        .tag-mini.open24 {
+            background: var(--color-open-bg);
+            color: var(--color-open-text);
+            border-color: var(--color-open-border);
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-light);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .no-results i {
+            font-size: 32px;
+            color: var(--border-color);
+        }
+
+        /* 지도 영역 */
+        #map {
+            flex-grow: 1;
+            height: 100%;
+            z-index: 1001;
+        }
+
+        /* 4. 커스텀 지도 마커 및 펄스 */
+        .custom-div-icon {
+            background: transparent;
+            border: none;
+        }
+
+        .marker-pin {
+            width: 32px;
+            height: 32px;
+            border-radius: 50% 50% 50% 0;
+            background: var(--primary-color);
+            position: absolute;
+            transform: rotate(-45deg);
+            left: 50%;
+            top: 50%;
+            margin: -16px 0 0 -16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            border: 2px solid #ffffff;
+            transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .marker-pin i {
+            transform: rotate(45deg);
+            color: #ffffff;
+            font-size: 12px;
+        }
+
+        /* 활성화된 마커 스케일 업 및 피치 */
+        .marker-pin.active {
+            background: var(--accent-gold) !important;
+            transform: rotate(-45deg) scale(1.22);
+            box-shadow: 0 6px 14px rgba(0,0,0,0.45);
+            border-color: white;
+            z-index: 99999 !important;
+        }
+
+        .marker-pin.active i {
+            color: var(--dark-charcoal);
+            font-weight: 900;
+        }
+
+        /* 태그별 마커 고유 칼라 */
+        .marker-pin.open24 {
+            background: #553c9a; /* 24시: 퍼플 */
+        }
+        .marker-pin.quiet {
+            background: #22543d; /* 조용함: 그린 */
+        }
+        .marker-pin.plug {
+            background: #bd5319; /* 콘센트: 오랜지 */
+        }
+
+        /* 학교 마커 특별 핀 */
+        .school-marker-icon {
+            background: white;
+            border: 2px solid var(--primary-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-md);
+        }
+
+        /* 실시간 사용자 Pulse Dot */
+        .pulse-dot {
+            width: 14px;
+            height: 14px;
+            background: #3182ce;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        
+        .pulse-dot::after {
+            content: '';
+            width: 32px;
+            height: 32px;
+            background: rgba(49, 130, 206, 0.35);
+            border-radius: 50%;
+            position: absolute;
+            top: -11px;
+            left: -11px;
+            animation: pulse 1.8s infinite ease-out;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.4); opacity: 1; }
+            100% { transform: scale(2.2); opacity: 0; }
+        }
+
+        /* 5. 플로팅 디테일 모달 (Bottom Sheet & Overlay Card) */
+        .modal {
+            position: fixed;
+            bottom: -100%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 480px;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 20px;
+            box-shadow: 0 -10px 25px rgba(0,0,0,0.08), 0 15px 35px rgba(0,0,0,0.12);
+            transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.15);
+            z-index: 1005;
+            padding: 24px;
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .modal.active {
+            bottom: 24px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 1.5px solid var(--border-color);
+            padding-bottom: 12px;
+        }
+
+        .modal-title-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--dark-charcoal);
+        }
+
+        .close-btn {
+            background: var(--bg-gray);
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            font-size: 18px;
+            cursor: pointer;
+            color: var(--text-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .close-btn:hover {
+            background: var(--border-color);
+            color: var(--dark-charcoal);
+        }
+        
+        .info-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .tag {
+            font-size: 12px;
+            font-weight: 700;
+            padding: 5px 12px;
+            border-radius: 20px;
+            border: 1.5px solid transparent;
+        }
+
+        .tag.plug {
+            background: var(--color-plug-bg);
+            color: var(--color-plug-text);
+            border-color: var(--color-plug-border);
+        }
+
+        .tag.quiet {
+            background: var(--color-quiet-bg);
+            color: var(--color-quiet-text);
+            border-color: var(--color-quiet-border);
+        }
+
+        .tag.open24 {
+            background: var(--color-open-bg);
+            color: var(--color-open-text);
+            border-color: var(--color-open-border);
+        }
+
+        .modal-body {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .modal-body p {
+            color: var(--text-dark);
+            line-height: 1.5;
+            font-size: 14.5px;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            background: var(--bg-gray);
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(0,0,0,0.02);
+        }
+
+        .modal-body p i {
+            margin-top: 3px;
+            font-size: 14px;
+            width: 18px;
+            text-align: center;
+        }
+
+        /* 6. 모바일 플로팅 액션 버튼 (FAB) */
+        .fab-btn {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--primary-color);
+            color: white;
+            padding: 14px 24px;
+            border-radius: 30px;
+            border: none;
+            font-size: 14px;
+            font-weight: 700;
+            box-shadow: 0 4px 15px rgba(158, 27, 50, 0.45);
+            z-index: 1006;
+            cursor: pointer;
+            display: none; /* 모바일 전용 미디어 쿼리에서 활성화 */
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        .fab-btn:hover {
+            background: var(--primary-hover);
+            transform: translateX(-50%) scale(1.05);
+        }
+
+        /* 7. 토스트 알림 메시지 시스템 */
+        #toast-container {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: rgba(26, 26, 26, 0.95);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 13.5px;
+            font-weight: 600;
+            box-shadow: var(--shadow-lg);
+            animation: fadeInOut 3.2s forwards cubic-bezier(0.175, 0.885, 0.32, 1.15);
+            border-left: 5px solid var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            backdrop-filter: blur(8px);
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateY(-20px); }
+            12% { opacity: 1; transform: translateY(0); }
+            88% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-20px); }
+        }
+
+        /* 8. 반응형 레이아웃 디자인 (태블릿 & 모바일 대응) */
+        @media (max-width: 768px) {
+            header {
+                padding: 14px 18px;
+            }
+            header h1 {
+                font-size: 16px;
+            }
+            .controls-panel {
+                padding: 10px 16px;
+                gap: 8px;
+            }
+            .search-input {
+                padding: 10px 14px 10px 38px;
+                font-size: 13px;
+            }
+            .search-wrapper i {
+                left: 12px;
+                font-size: 14px;
+            }
+            .filter-row {
+                flex-wrap: wrap;
+            }
+            .filter-btn {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+            .univ-search-btn {
+                margin-left: 0;
+                width: 100%;
+                justify-content: center;
+                margin-top: 4px;
+            }
+            .main-container {
+                height: calc(100% - 110px);
+            }
+            #sidebar {
+                position: fixed;
+                top: 110px; /* Header + controls 높이 */
+                left: -100%;
+                width: 100%;
+                height: calc(100% - 110px);
+                z-index: 1002;
+                border-right: none;
+            }
+            #sidebar.active {
+                left: 0;
+            }
+            .fab-btn {
+                display: flex;
+            }
+            .modal {
+                width: 92%;
+                padding: 18px;
+            }
+            .modal-title {
+                font-size: 18px;
+            }
+            .modal-body p {
+                font-size: 13.5px;
+                padding: 10px 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 1. 상단 바 -->
+    <header>
+        <div class="header-title-container">
+            <span class="logo-badge" id="current-univ-badge">고려대 카공</span>
+            <h1>🎓 <span id="univ-name-display">고려대학교</span> <span>카공 지도</span></h1>
+        </div>
+        <div id="gps-indicator" class="gps-status">
+            <i class="fa-solid fa-location-dot"></i>
+            <span id="gps-text">위치 정보 찾는 중...</span>
+        </div>
+    </header>
+    
+    <!-- 2. 검색 및 필터 패널 -->
+    <div class="controls-panel">
+        <div class="search-row">
+            <div class="search-wrapper">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="search-input" class="search-input" placeholder="카페 이름, 특징, 키워드로 카공 공간을 검색해보세요..." oninput="handleSearch(event)">
+            </div>
+        </div>
+        <div class="filter-row">
+            <button class="filter-btn active" onclick="toggleFilter('all', this)">
+                <i class="fa-solid fa-rotate-left"></i>전체보기
+            </button>
+            <button class="filter-btn" onclick="toggleFilter('plug', this)">
+                <i class="fa-solid fa-plug" style="color: #bd5319;"></i>콘센트 많음
+            </button>
+            <button class="filter-btn" onclick="toggleFilter('quiet', this)">
+                <i class="fa-solid fa-comment-slash" style="color: #22543d;"></i>조용한 분위기
+            </button>
+            <button class="filter-btn" onclick="toggleFilter('open24', this)">
+                <i class="fa-solid fa-clock" style="color: #553c9a;"></i>24시 영업
+            </button>
+            <button class="filter-btn univ-search-btn" onclick="triggerManualSearch()">
+                <i class="fa-solid fa-location-crosshairs"></i> 🔄 주변 대학교 탐색
+            </button>
+        </div>
+    </div>
+
+    <!-- 3. 메인 레이아웃 (사이드바 & 지도) -->
+    <div class="main-container">
+        <!-- 좌측 사이드바: 카페 리스트 -->
+        <div id="sidebar">
+            <div class="sidebar-header">
+                <span>📍 주변 카공 검색 결과</span>
+                <span id="cafe-count" class="count-badge">0개</span>
+            </div>
+            <div id="cafe-list" class="cafe-list">
+                <!-- Javascript를 통해 동적으로 렌더링 -->
+            </div>
+        </div>
+
+        <!-- 우측 지도 영역 -->
+        <div id="map"></div>
+    </div>
+
+    <!-- 4. 모바일 및 데스크톱 상세 정보 팝업 모달 -->
+    <div id="cafe-modal" class="modal">
+        <div class="modal-header">
+            <div class="modal-title-wrap">
+                <div id="modal-title" class="modal-title">카페 이름</div>
+            </div>
+            <button class="close-btn" onclick="closeModal()">&times;</button>
+        </div>
+        <div id="modal-tags" class="info-tags"></div>
+        <div id="modal-body" class="modal-body">
+            <p id="modal-tip">🔌 <strong>콘센트 팁:</strong> 정보 로딩 중...</p>
+            <p id="modal-time">🚶 <strong>도보 소요 시간:</strong> 정보 로딩 중...</p>
+            <p id="modal-review">📝 <strong>한 줄 평:</strong> 정보 로딩 중...</p>
+        </div>
+    </div>
+
+    <!-- 5. 모바일 플로팅 목록 버튼 -->
+    <button id="list-toggle-btn" class="fab-btn" onclick="toggleSidebarMobile()">
+        <i class="fa-solid fa-list"></i> 목록 보기
+    </button>
+
+    <!-- 6. 토스트 알림 컨테이너 -->
+    <div id="toast-container"></div>
+
+    <script>
+        // 1. 고려대학교 정밀 큐레이션 데이터베이스 (2.5km 이내 접근 시 기본 활성화)
+        const curatedCafeData = [
+            { id: 1, name: "스타벅스 안암역점", lat: 37.5868, lng: 127.0294, type: ["plug"], tip: "2층과 3층에 콘센트가 구비된 긴 테이블이 많이 배치되어 있습니다.", time: "고려대 안암역 3번 출구 도보 1분 / 정문 8분", review: "대학가 매장답게 카공 전용 테이블이 잘 되어 있어 노트북하기 정말 편합니다." },
+            { id: 2, name: "스타벅스 고려대점", lat: 37.5908, lng: 127.0345, type: ["plug"], tip: "창가 좌석과 중앙 대형 테이블 아래에 개별 콘센트가 있습니다.", time: "고려대 정문 건너편 도보 2분", review: "고대 정문 바로 앞이라 공강 때 들러서 간단한 과제 하기에 최적입니다." },
+            { id: 3, name: "스타벅스 안암개운사점", lat: 37.5888, lng: 127.0305, type: ["plug"], tip: "1층과 2층 창가 쪽 바 테이블에 콘센트가 설치되어 있습니다.", time: "고려대 개운사길 입구 / 정문 도보 5분", review: "매장이 깔끔하고 아침 시간에 방문하면 특히 조용해서 좋습니다." },
+            { id: 4, name: "투썸플레이스 안암역점", lat: 37.5858, lng: 127.0291, type: ["plug"], tip: "2층 매장이 아주 넓고, 벽면 소파 자리 밑과 단체석에 콘센트 완비.", time: "고려대 안암역 2번 출구 바로 앞 / 정문 도보 7분", review: "디저트와 함께 노트북 작업하기 좋고 공간이 넓어 답답함이 없습니다." },
+            { id: 5, name: "투썸플레이스 고려대정문점", lat: 37.5906, lng: 127.0337, type: ["plug"], tip: "중앙 스터디 테이블 및 창가 바 테이블에 무선 충전기와 콘센트가 있습니다.", time: "고려대 정문 맞은편 도보 1분", review: "신설 매장이라 내부가 매우 쾌적하고 조용한 편입니다." },
+            { id: 6, name: "커피빈 고려대안암역점", lat: 37.5862, lng: 127.0296, type: ["plug"], tip: "벽면 소파 전 좌석 및 거의 모든 자리에 아웃렛이 마련되어 있습니다.", time: "고려대 안암역 3번 출구 도보 2분 / 정문 7분", review: "의자가 매우 편안하고 잔잔한 재즈 음악 덕분에 집중이 아주 잘 됩니다." },
+            { id: 7, name: "할리스 안암역점", lat: 37.5860, lng: 127.0289, type: ["plug", "open24"], tip: "지하 1층부터 3층까지 건물 전체가 카페이며, 독서실형 1인 좌석이 다수 제공됩니다.", time: "고려대 안암역 4번 출구 앞 / 정문 도보 6분", review: "시험 기간 24시 밤샘 카공에 최적화된 메카. 고대생들에게 가장 핫한 밤샘 공간입니다." },
+            { id: 8, name: "이디야커피 고려대점", lat: 37.5898, lng: 127.0335, type: ["quiet"], tip: "매장이 아담하여 1인 공부 및 독서에 어울리는 테이블 구조입니다.", time: "고려대 정문 도보 3분", review: "가성비 좋고 가벼운 마음으로 책 보거나 과제하기에 편안합니다." },
+            { id: 9, name: "카페 J (Cafe J)", lat: 37.5885, lng: 127.0310, type: ["plug", "quiet"], tip: "지하 스터디 공간에는 자리마다 개별 조명과 풍부한 아웃렛이 구비되어 있습니다.", time: "고려대 개운사길 도보 2분 / 정문 도보 5분", review: "지하 1층은 독서실급으로 고요하고 전용 데스크가 많아서 집중하기 환상적입니다." },
+            { id: 10, name: "와플앨리 고대점", lat: 37.5878, lng: 127.0290, type: ["quiet"], tip: "아기자기한 복층 구석자리에 비밀 공간처럼 콘센트 자리가 있습니다.", time: "고려대 참살이길 골목 / 정문 도보 6분", review: "달콤한 와플과 함께 백색소음 가득한 아늑한 공간에서 편하게 힐링 작업 가능합니다." },
+            { id: 11, name: "랭스터디카페 고려대점", lat: 37.5855, lng: 127.0299, type: ["plug", "quiet", "open24"], tip: "잔잔한 배경음악이 흐르는 넓은 좌석마다 2구 콘센트 및 무선 충전패드가 장착되어 있습니다.", time: "고려대 안암역 3번 출구 도보 3분 / 정문 9분", review: "음료 요금이 포함되어 실질적 가성비가 훌륭하며 밤샘 공부에 강력히 추천합니다." },
+            { id: 12, name: "초심스터디카페 고려대점", lat: 37.5871, lng: 127.0292, type: ["quiet", "open24"], tip: "공부 성향에 따라 소음 허용 카페존과 완전 고요한 스터디존을 선택해 이용할 수 있습니다.", time: "고려대 안암역 3번 출구 도보 2분 / 정문 7분", review: "카페 백색소음이 싫고 고요한 독서실 분위기를 원할 때 완벽한 선택입니다." },
+            { id: 13, name: "포레스트스터디카페 고대안암점", lat: 37.5864, lng: 127.0302, type: ["quiet", "open24"], tip: "프린터 사용 가능, 전 좌석 최고급 의자와 개별 스탠드가 설치되어 있습니다.", time: "고려대 안암역 3번 출구 도보 3분 / 정문 7분", review: "시설이 무척 깨끗하고 환기가 잘되어 장시간 집중하기 좋습니다." },
+            { id: 14, name: "공부공방 스터디카페 안암점", lat: 37.5857, lng: 127.0287, type: ["quiet", "open24"], tip: "담요, 독서대, 충전기가 상시 대여되며 프리미엄 원두커피가 무제한 제공됩니다.", time: "고려대 안암역 3번 출구 도보 2분 / 정문 8분", review: "사물함 시설과 스터디룸 예약이 잘 되어있고 관리자 피드백이 빨라 쾌적합니다." },
+            { id: 15, name: "카페 브레브 (Cafe Breve)", lat: 37.5880, lng: 127.0315, type: ["quiet"], tip: "통창이 있는 2인용 목재 테이블 위주로 잔잔한 햇살과 콘센트가 제공됩니다.", time: "고려대 개운사길 초입 / 정문 도보 4분", review: "화이트&우드 톤으로 눈이 편하고 클래식 음악이 잔잔히 깔려 카공하기 아주 좋습니다." },
+            { id: 16, name: "커피수프림", lat: 37.5865, lng: 127.0305, type: ["plug"], tip: "매장 벽면을 둘러싸고 콘센트가 넉넉하게 부착되어 있습니다.", time: "고려대 참살이길 중간 / 정문 도보 7분", review: "디저트 구색이 훌륭하고 테이블 높이가 적절해서 필기나 타이핑에 무리가 없습니다." },
+            { id: 17, name: "카페 명수", lat: 37.5895, lng: 127.0312, type: ["quiet"], tip: "조용한 주택가 골목길 1층에 자리 잡고 있어 창 밖을 보며 사색하기에 좋습니다.", time: "고려대 법대후문 골목 / 정문 도보 4분", review: "한적한 동네 주민 아지트 느낌으로 매우 조용하여 과제 몰입도가 높습니다." },
+            { id: 18, name: "커피나무 안암역점", lat: 37.5861, lng: 127.0298, type: ["plug"], tip: "2층 창가의 긴 바 테이블 좌석 곳곳에 2구 콘센트가 설치되어 있습니다.", time: "고려대 안암역 3번 출구 도보 1분 / 정문 7분", review: "달콤한 조각케이크와 함께 당 충전하며 중간고사 시험공부하기 정말 좋습니다." },
+            { id: 19, name: "소울메이트 카페", lat: 37.5873, lng: 127.0285, type: ["quiet"], tip: "다락 형태의 아기자기한 방과 등받이가 편안한 소파 석이 많습니다.", time: "고려대 참살이길 골목 / 정문 도보 7분", review: "감성적인 조명과 편안함 덕분에 조용히 태블릿 필기를 하기에 좋습니다." },
+            { id: 20, name: "카페 56st", lat: 37.5888, lng: 127.0282, type: ["plug", "quiet"], tip: "중앙 8인 스터디 테이블에 빌트인 멀티탭이 탑재되어 노트북 작업에 좋습니다.", time: "고려대 안암역 4번 출구 도보 3분 / 정문 5분", review: "모던하고 깔끔한 감성에 조용한 분위기까지 갖춘 참살이길 인근의 숨은 공부 명소입니다." },
+            { id: 21, name: "어보브더레벨", lat: 37.5852, lng: 127.0288, type: ["quiet"], tip: "2층 창가 바 테이블 및 4인 테이블 밑에 멀티탭이 적절히 배치되어 있습니다.", time: "고려대 안암역 3번 출구 도보 4분 / 정문 8분", review: "탁 트인 2층 통창 뷰가 특징으로, 답답하지 않게 조용한 음악을 들으며 카공할 수 있습니다." },
+            { id: 22, name: "키라쿠", lat: 37.5883, lng: 127.0303, type: ["quiet"], tip: "매장이 고즈넉하고 대화 소리가 크지 않은 정적인 무드를 유지합니다.", time: "고려대 개운사길 골목 / 정문 도보 5분", review: "달콤하고 부드러운 푸딩을 맛보며 가볍게 소설을 읽거나 요약 노트 정리하기 좋습니다." },
+            { id: 23, name: "헤이피", lat: 37.5875, lng: 127.0312, type: ["quiet"], tip: "알록달록 예쁜 감성 카페이나 평일 낮에는 대체로 차분하여 다이어리 정리나 과제에 좋습니다.", time: "고려대 안암역 2번 출구 도보 3분 / 정문 6분", review: "눈이 즐거운 캐릭터 케이크와 함께 나만의 조용한 힐링 공부 시간을 가질 수 있습니다." },
+            { id: 24, name: "카페 애일", lat: 37.5892, lng: 127.0325, type: ["quiet"], tip: "안쪽 단독 테이블 구역에 콘센트가 지원되며 전반적으로 조용한 주택가 골목 무드입니다.", time: "고려대 정문 옆 골목 도보 3분", review: "고대 정문 근처에서 소음 없이 혼자만의 과제나 코딩에 집중할 수 있는 귀한 공간입니다." },
+            { id: 25, name: "더피터커피 안암점", lat: 37.5850, lng: 127.0295, type: ["plug"], tip: "1인용 벽면 테이블마다 전용 콘센트가 있고 의자 쿠션이 편안합니다.", time: "고려대 안암역 3번 출구 도보 5분 / 정문 9분", review: "훌륭한 브루잉 커피를 마시면서 오롯이 태블릿과 노트북으로 보고서를 작성할 수 있습니다." },
+            { id: 26, name: "모블러 (Mobler)", lat: 37.5881, lng: 127.0278, type: ["quiet"], tip: "매장이 미니멀하고 차분하여 번잡한 참살이길을 벗어나 집중하기 편리합니다.", time: "고려대 안암역 4번 출구 도보 4분 / 정문 5분", review: "맛있는 휘낭시에를 먹으며 간단한 논문 읽기나 정리 작업을 조용하게 하기에 좋습니다." },
+            { id: 27, name: "빽다방 고려대역점", lat: 37.5902, lng: 127.0360, type: ["plug"], tip: "안쪽의 2인 좌석 아래에 소수의 충전 콘센트가 있습니다.", time: "고려대 고려대역 6번 출구 도보 2분 / 정문 3분", review: "부담 없는 가성비 음료를 시키고 단시간 집중해서 퀴즈 공부를 하기에 딱 적합합니다." },
+            { id: 28, name: "에이바우트커피 안암점", lat: 37.5866, lng: 127.0285, type: ["plug", "quiet"], tip: "거의 모든 좌석에 개별 칸막이와 1인 1콘센트가 배치된 카공 전용 카페입니다.", time: "고려대 참살이길 중심가 / 정문 도보 6분", review: "카공족의 천국. 1인 독서실 좌석이 가득해서 오랜 시간 노트북 코딩이나 공부를 눈치 안 보고 합니다." },
+            { id: 29, name: "더벤티 안암역점", lat: 37.5863, lng: 127.0292, type: ["quiet"], tip: "주로 테이크아웃 위주이나 내부에 아담하게 마련된 2인용 조용한 테이블이 2개 있습니다.", time: "고려대 안암역 3번 출구 도보 1분 / 정문 7분", review: "저렴한 음료를 마시며 빠르게 조용하게 요약본을 훑어보고 시험장 들어가기 좋습니다." },
+            { id: 30, name: "파스쿠찌 고려대정문점", lat: 37.5905, lng: 127.0340, type: ["plug"], tip: "2층 통유리창 좌석라인 전체와 중앙 대형 원목 테이블에 충전용 단자가 많습니다.", time: "고려대 정문 바로 맞은편 도보 1분", review: "넓고 시원하며 단체 조별 회의나 팀 프로젝트 발표 자료 제작 시에 최상의 공간을 제공합니다." },
+            { id: 31, name: "더플레이스 고려대스퀘어점", lat: 37.5912, lng: 127.0350, type: ["plug", "quiet"], tip: "건물 내 보안이 좋고 조용한 테이블들이 복도 방향을 따라 배치되어 있으며 멀티탭이 가깝습니다.", time: "고려대 백주년기념관 뒤편 건물 / 정문 도보 3분", review: "학교 내 스퀘어 빌딩 안에 있어 조용하고 쾌적하게 자습이 가능한 공간입니다." }
+        ];
+
+        // 2. 동적 로드 데이터베이스 (기본값은 고려대 큐레이션)
+        let loadedCafes = [...curatedCafeData];
+
+        let map;
+        let markers = [];
+        let markerMap = {}; // Cafe ID -> L.marker
+        let currentFilter = 'all';
+        let searchQuery = '';
+        const kuMainGate = [37.5902, 127.0332]; // 고려대 정문 중심
+
+        // 3. 지도 초기화 및 실시간 현재 위치 기준 연동
+        function initMap() {
+            // 기본 지도 인스턴스 고려대학교 기준 로드
+            map = L.map('map').setView(kuMainGate, 16);
+            
+            // 고급 타일 레이어 적용 (OpenStreetMap)
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+
+            // 기본 고려대학교 정문 마커 표시
+            drawUniversityCenter(kuMainGate[0], kuMainGate[1], "고려대학교 서울캠퍼스");
+
+            // 브라우저 실시간 Geolocation API 구동
+            detectUserLocation(false); // 수동이 아닌 자동 최초 감지
+        }
+
+        // 대학교 센터 마커 렌더링
+        function drawUniversityCenter(lat, lng, name) {
+            if (window.univMarker) {
+                map.removeLayer(window.univMarker);
+            }
+            const schoolIcon = L.divIcon({
+                className: 'school-marker-icon',
+                html: '<i class="fa-solid fa-graduation-cap" style="color: #9E1B32; font-size: 16px;"></i>',
+                iconSize: [28, 28],
+                iconAnchor: [14, 14]
+            });
+            window.univMarker = L.marker([lat, lng], { icon: schoolIcon }).addTo(map).bindPopup(`<b>${name}</b>`);
+        }
+
+        // 실시간 위치 감지 함수
+        function detectUserLocation(isManualSearch = false) {
+            const gpsText = document.getElementById('gps-text');
+            const gpsIndicator = document.getElementById('gps-indicator');
+
+            if (navigator.geolocation) {
+                gpsText.innerText = "위치 정보 동기화 중...";
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        const userLatLng = [lat, lng];
+
+                        // 위치 서비스 표시 활성화
+                        gpsIndicator.classList.add('active');
+                        gpsText.innerText = "실시간 내 위치 연동";
+
+                        // 실시간 사용자 Pulse 마커 추가
+                        const pulseIcon = L.divIcon({
+                            className: 'user-pulse-icon',
+                            html: '<div class="pulse-dot"></div>',
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        });
+                        
+                        // 기존 사용자 마커가 있다면 제거
+                        if (window.userMarker) {
+                            map.removeLayer(window.userMarker);
+                        }
+                        window.userMarker = L.marker(userLatLng, { icon: pulseIcon }).addTo(map).bindPopup("<b>내 현재 위치</b>");
+                        
+                        // 하이브리드 로케이션 로직 구동
+                        const distToKU = getDistance(lat, lng, kuMainGate[0], kuMainGate[1]);
+                        
+                        if (distToKU <= 2500 && !isManualSearch) {
+                            // 2.5km 이내면 고려대 정밀 큐레이션 데이터 자동 동기화
+                            showToast("고려대학교 주변으로 감지되었습니다. 정밀 큐레이션 데이터를 로드합니다.", "fa-check-double");
+                            loadDefaultKUData();
+                            map.flyTo(userLatLng, 16, { animate: true, duration: 1.2 });
+                        } else {
+                            // 거리가 멀거나 수동 검색 시, OpenStreetMap Overpass API를 통해 실시간 근접 대학 및 카페 서칭
+                            fetchNearestUniversityAndCafes(lat, lng);
+                        }
+                    },
+                    (error) => {
+                        console.warn("Geolocation API 실패: ", error);
+                        gpsIndicator.classList.remove('active');
+                        gpsText.innerText = "기본 설정 (고대정문)";
+                        
+                        if (isManualSearch) {
+                            showToast("위치 권한을 획득할 수 없어 대학교 탐색에 실패했습니다.", "fa-circle-exclamation");
+                        } else {
+                            showToast("위치 정보를 가져올 수 없어 고려대학교 정문을 기본값으로 로드합니다.", "fa-circle-exclamation");
+                            loadDefaultKUData();
+                        }
+                    },
+                    { enableHighAccuracy: true, timeout: 7000, maximumAge: 0 }
+                );
+            } else {
+                gpsIndicator.classList.remove('active');
+                gpsText.innerText = "지원 안 함";
+                showToast("브라우저가 실시간 위치 감지 기능을 지원하지 않습니다.", "fa-triangle-exclamation");
+                loadDefaultKUData();
+            }
+        }
+
+        // 고려대학교 기본 큐레이션 데이터 로딩
+        function loadDefaultKUData() {
+            document.getElementById('univ-name-display').innerText = "고려대학교";
+            document.getElementById('current-univ-badge').innerText = "고려대 카공";
+            loadedCafes = [...curatedCafeData];
+            drawUniversityCenter(kuMainGate[0], kuMainGate[1], "고려대학교 서울캠퍼스");
+            updateUI();
+        }
+
+        // 수동 내 주변 탐색 트리거
+        function triggerManualSearch() {
+            closeModal();
+            detectUserLocation(true); // 수동 플래그 전달
+        }
+
+        // 4. Overpass API: 가장 가까운 대학교 찾기
+        function fetchNearestUniversityAndCafes(lat, lng) {
+            showToast("5km 이내 인근 대학교를 검색하고 있습니다...", "fa-spinner fa-spin");
+            
+            const query = `[out:json][timeout:15];
+(
+  node["amenity"="university"](around:5000, ${lat}, ${lng});
+  way["amenity"="university"](around:5000, ${lat}, ${lng});
+  relation["amenity"="university"](around:5000, ${lat}, ${lng});
+);
+out center;`;
+
+            fetch('https://overpass-api.de/api/interpreter', {
+                method: 'POST',
+                body: query
+            })
+            .then(res => {
+                if (!res.ok) throw new Error("API Network Response Error");
+                return res.json();
+            })
+            .then(data => {
+                if (!data.elements || data.elements.length === 0) {
+                    showToast("반경 5km 이내에 등록된 대학교를 찾을 수 없어 고려대 데이터를 유지합니다.", "fa-circle-question");
+                    loadDefaultKUData();
+                    return;
+                }
+
+                // 가장 가까운 대학 선별
+                let closestUniv = null;
+                let minDistance = Infinity;
+
+                data.elements.forEach(el => {
+                    const uLat = el.lat || (el.center && el.center.lat);
+                    const uLng = el.lon || (el.center && el.center.lon);
+                    const uName = el.tags.name || el.tags["name:ko"] || el.tags["name:en"];
+                    if (!uLat || !uLng || !uName) return;
+
+                    const dist = getDistance(lat, lng, uLat, uLng);
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        closestUniv = { name: uName, lat: uLat, lng: uLng };
+                    }
+                });
+
+                if (!closestUniv) {
+                    showToast("가까운 대학 정보를 분석하지 못해 고려대 데이터를 로딩합니다.", "fa-circle-exclamation");
+                    loadDefaultKUData();
+                    return;
+                }
+
+                // 고대가 발견된 경우 큐레이션 로드
+                if (closestUniv.name.includes("고려대") || closestUniv.name.includes("Korea University")) {
+                    showToast("고려대학교 서울캠퍼스가 감지되었습니다. 정밀 큐레이션 데이터를 로드합니다.", "fa-check-double");
+                    loadDefaultKUData();
+                    // 사용자가 고려대에서 수동 호출 시에도 뷰포트 정렬
+                    map.flyTo(kuMainGate, 16, { animate: true, duration: 1.0 });
+                    return;
+                }
+
+                // 대학교 명 갱신
+                const cleanUnivName = closestUniv.name.replace("서울캠퍼스", "").replace("캠퍼스", "").trim();
+                document.getElementById('univ-name-display').innerText = cleanUnivName;
+                
+                // 배지 텍스트 조절
+                const shortBadge = cleanUnivName.length > 5 ? cleanUnivName.substring(0, 4) + ".." : cleanUnivName;
+                document.getElementById('current-univ-badge').innerText = `${shortBadge} 카공`;
+
+                showToast(`[${cleanUnivName}] 주변의 카페를 탐색합니다.`, "fa-graduation-cap");
+
+                // 대학교 마커 그리기
+                drawUniversityCenter(closestUniv.lat, closestUniv.lng, closestUniv.name);
+
+                // 해당 대학 반경 1km 이내의 실제 카페 데이터 긁어오기
+                fetchCafesAroundUniversity(closestUniv.lat, closestUniv.lng, cleanUnivName);
+            })
+            .catch(err => {
+                console.error("University API 에러: ", err);
+                showToast("네트워크 상태가 불안정해 대학교 정보를 조회하지 못했습니다.", "fa-wifi");
+                loadDefaultKUData();
+            });
+        }
+
+        // 5. Overpass API: 특정 대학교 주변 실제 카페 긁어오기
+        function fetchCafesAroundUniversity(univLat, univLng, univName) {
+            showToast("실시간 주변 실제 카페 데이터를 연동 중입니다...", "fa-spinner fa-spin");
+
+            const query = `[out:json][timeout:15];
+(
+  node["amenity"="cafe"](around:1000, ${univLat}, ${univLng});
+  way["amenity"="cafe"](around:1000, ${univLat}, ${univLng});
+);
+out center;`;
+
+            fetch('https://overpass-api.de/api/interpreter', {
+                method: 'POST',
+                body: query
+            })
+            .then(res => {
+                if (!res.ok) throw new Error("API Network Response Error");
+                return res.json();
+            })
+            .then(data => {
+                if (!data.elements || data.elements.length === 0) {
+                    showToast("1km 이내에 지도에 등록된 카페를 찾지 못했습니다.", "fa-circle-xclamation");
+                    loadedCafes = [];
+                    updateUI();
+                    return;
+                }
+
+                // 동적 데이터 변환 엔진
+                const parsedCafes = generateDynamicCafeData(data.elements, univName, univLat, univLng);
+
+                // 도보 거리순 정렬
+                loadedCafes = parsedCafes.sort((a, b) => {
+                    const distA = getDistance(a.lat, a.lng, univLat, univLng);
+                    const distB = getDistance(b.lat, b.lng, univLat, univLng);
+                    return distA - distB;
+                });
+
+                // 카메라 이동
+                map.flyTo([univLat, univLng], 15.5, { animate: true, duration: 1.0 });
+
+                showToast(`총 ${loadedCafes.length}개의 실제 카페가 발견되었습니다!`, "fa-check");
+                updateUI();
+            })
+            .catch(err => {
+                console.error("Cafes API 에러: ", err);
+                showToast("카페 정보를 연동하는 중 오류가 발생해 고려대 기본값을 띄웁니다.", "fa-wifi");
+                loadDefaultKUData();
+            });
+        }
+
+        // 6. 템플릿 기반 실시간 리뷰/조건 자동 생성 엔진 (OSM 속성 가공)
+        function generateDynamicCafeData(elements, univName, univLat, univLng) {
+            const brandInfo = {
+                starbucks: {
+                    tags: ["plug"],
+                    tip: "콘센트가 구비된 대형 스터디 테이블이 많고, 벽면 기둥마다 충전 포트가 있습니다.",
+                    reviews: [
+                        "역시 믿고 가기 좋은 카공의 정석입니다. 기가 와이파이 속도도 아주 빨라요.",
+                        "대형 매장이라 카공족이 아주 많은데, 백색소음 수준이라 눈치 안 보이고 작업하기 좋습니다.",
+                        "콘센트 자리가 아주 잘 분배되어 있어서 노트북 작업이나 과제하기 최적의 장소입니다."
+                    ]
+                },
+                twosome: {
+                    tags: ["plug"],
+                    tip: "벽면 소파 아래 콘센트가 있고 중앙의 커뮤니티 테이블에 콘센트가 밀집해 있습니다.",
+                    reviews: [
+                        "매장이 대체로 넓고 탁 트여서 오래 앉아 있어도 답답하지 않아요. 케이크와 함께 공부하기 좋아요.",
+                        "공부하기 좋은 높은 테이블이 넉넉히 배치되어 있어서 인기가 많은 공간입니다.",
+                        "노트북 충전하면서 인강 듣거나 조별 모임 발표 자료 만들기에 아주 편리합니다."
+                    ]
+                },
+                ediya: {
+                    tags: ["quiet"],
+                    tip: "매장이 아담하지만 구석자리에 알차게 1인용 콘센트가 마련되어 있습니다.",
+                    reviews: [
+                        "음료 가격이 합리적이고 가볍게 1~2시간 태블릿으로 전공 서적 훑어보기에 딱입니다.",
+                        "조용하고 잔잔한 음악이 흘러나와 시험기간 전공 정리나 조용히 책 읽기에 추천합니다.",
+                        "아기자기한 분위기로 가성비 카공을 원할 때 들르기 제일 편한 곳입니다."
+                    ]
+                },
+                hollys: {
+                    tags: ["plug", "open24"],
+                    tip: "1인 칸막이 독서실 좌석이 잘 설계되어 있고 좌석마다 2구 콘센트가 있습니다.",
+                    reviews: [
+                        "시험 기간 밤샘 카공할 때 학생들이나 취준생들의 1순위 대피소입니다. 시설이 아주 좋음.",
+                        "독서실 좌석 배치가 신의 한 수입니다. 눈치 안 보고 공부에 집중할 수 있습니다.",
+                        "콘센트 인프라와 의자 편안함이 아주 훌륭해서 대만족입니다."
+                    ]
+                },
+                pascucci: {
+                    tags: ["plug"],
+                    tip: "중앙 원목 테이블과 창가 바 석에 콘센트가 집중적으로 배치되어 있습니다.",
+                    reviews: [
+                        "매장이 시원하고 의자가 편해서 오래 집중해서 보고서 쓰기 정말 좋습니다.",
+                        "테이블 면적이 넓어서 전공책 여러 권 펼쳐놓고 필기하기 좋습니다."
+                    ]
+                },
+                mega: {
+                    tags: ["quiet"],
+                    tip: "테이크아웃 위주이나 안쪽 바 테이블에 간이 콘센트가 2구 제공됩니다.",
+                    reviews: [
+                        "가성비 커피와 함께 가볍게 노트북 작업을 하고 가기 무난한 장소입니다.",
+                        "음료 가격이 저렴하여 부담 없이 모바일로 수업 영상을 들을 수 있습니다."
+                    ]
+                },
+                compose: {
+                    tags: ["quiet"],
+                    tip: "내부에 충전할 수 있는 콘센트가 1~2구 설치되어 있으니 구석 자리를 확보하세요.",
+                    reviews: [
+                        "저렴한 가격의 대용량 커피를 마시며 빠르게 자료 조사를 끝내기 편리한 공간입니다."
+                    ]
+                },
+                study: {
+                    tags: ["quiet", "open24", "plug"],
+                    tip: "스터디존과 카페존이 완벽 분리되어 있고, 스탠드 및 무선 충전기가 내장된 책상입니다.",
+                    reviews: [
+                        "완벽한 학습 집중을 위해 튜닝된 공간입니다. 고요함 그 자체라 몰입감이 최상입니다.",
+                        "무료 프린트 및 담요, 독서대 대여가 가능하여 밤샘 열공하기에 더할 나위 없습니다.",
+                        "시간제 요금이라 집중해서 빠르게 할 일 끝내고 싶을 때 결제해서 이용하고 있어요."
+                    ]
+                },
+                default: {
+                    tags: ["quiet"],
+                    tip: "벽면 소파 아래 및 벽 쪽에 2구 멀티탭이 적절히 배치되어 있습니다.",
+                    reviews: [
+                        "인테리어가 감성적이고 잔잔한 분위기라 집중해서 레포트 작성하기 참 좋습니다.",
+                        "동네 숨은 카공 플레이스 느낌으로 조용하고 사장님이 무척 친절하십니다.",
+                        "클래식 음악이 나지막이 흐르고 적당한 햇살이 들어 공부 환경이 아주 쾌적합니다.",
+                        "커피 향이 좋고 대화 소음이 적은 편이라 집중해서 공부할 수 있는 귀한 카페입니다."
+                    ]
+                }
+            };
+
+            const cafeList = [];
+            let idCounter = 100; // 큐레이션 ID와 구별
+
+            elements.forEach(el => {
+                const name = el.tags.name || el.tags["name:ko"] || el.tags["name:en"];
+                if (!name) return; // 이름 없는 길거리 편의점 카페 등 필터링
+
+                const lat = el.lat || (el.center && el.center.lat);
+                const lng = el.lon || (el.center && el.center.lon);
+                if (!lat || !lng) return;
+
+                // 대학교 센터 중심과의 거리 계산
+                const distMeters = Math.round(getDistance(lat, lng, univLat, univLng));
+                const walkMin = Math.max(1, Math.round(distMeters / 80)); // 분당 80m 보행 기준 계산
+                const timeStr = `정문에서 도보 약 ${walkMin}분 (${distMeters}m)`;
+
+                // 브랜드 카테고리 판정
+                const lowerName = name.toLowerCase();
+                let cat = "default";
+                if (lowerName.includes("스타벅스") || lowerName.includes("starbucks")) cat = "starbucks";
+                else if (lowerName.includes("투썸") || lowerName.includes("twosome")) cat = "twosome";
+                else if (lowerName.includes("이디야") || lowerName.includes("ediya")) cat = "ediya";
+                else if (lowerName.includes("할리스") || lowerName.includes("hollys")) cat = "hollys";
+                else if (lowerName.includes("파스쿠찌") || lowerName.includes("pascucci")) cat = "pascucci";
+                else if (lowerName.includes("메가") || lowerName.includes("mega")) cat = "mega";
+                else if (lowerName.includes("컴포즈") || lowerName.includes("compose")) cat = "compose";
+                else if (lowerName.includes("스터디") || lowerName.includes("study") || lowerName.includes("독서실")) cat = "study";
+
+                const info = brandInfo[cat];
+                
+                // 어울리는 태그 및 팁 랜덤화 가미
+                let tags = [...info.tags];
+                let tip = info.tip;
+                if (cat === "default") {
+                    const r = Math.random();
+                    if (r < 0.25) tags = ["plug"];
+                    else if (r < 0.5) tags = ["quiet"];
+                    else if (r < 0.75) tags = ["plug", "quiet"];
+                    else tags = ["quiet"];
+
+                    const defaultTips = [
+                        "벽면 소파 구역과 창가 바 테이블에 개별 멀티탭이 준비되어 있습니다.",
+                        "벽쪽 일부 자리에만 충전구가 있으니 조기에 안쪽 자리를 확보하세요.",
+                        "개인 충전기는 사장님께 말씀드리면 카운터에서 직접 충전해주시기도 합니다.",
+                        "가운데 넓은 우드슬랩 테이블 아래에 여러 구의 멀티탭이 설치되어 편리합니다."
+                    ];
+                    tip = defaultTips[Math.floor(Math.random() * defaultTips.length)];
+                }
+
+                // 리뷰 랜덤 셀렉션
+                const reviewIdx = Math.floor(Math.random() * info.reviews.length);
+                const review = info.reviews[reviewIdx];
+
+                cafeList.push({
+                    id: idCounter++,
+                    name: name,
+                    lat: lat,
+                    lng: lng,
+                    type: tags,
+                    tip: tip,
+                    time: timeStr,
+                    review: review
+                });
+            });
+
+            return cafeList;
+        }
+
+        // 7. 마커 렌더링 로직
+        function renderMarkers() {
+            // 기존 마커 전체 클리어
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+            markerMap = {};
+
+            const filteredData = getFilteredData();
+
+            filteredData.forEach(cafe => {
+                const markerClass = getMarkerClass(cafe.type);
+                const markerIcon = getMarkerIcon(cafe.type);
+
+                const customIcon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: `
+                        <div class="marker-pin ${markerClass}" id="pin-${cafe.id}">
+                            <i class="fa-solid ${markerIcon}"></i>
+                        </div>
+                    `,
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 32],
+                    popupAnchor: [0, -32]
+                });
+
+                const marker = L.marker([cafe.lat, cafe.lng], { icon: customIcon }).addTo(map);
+                
+                // 마커 클릭 이벤트 연동
+                marker.on('click', () => {
+                    showCafeDetail(cafe, marker);
+                });
+
+                markers.push(marker);
+                markerMap[cafe.id] = marker; // 매핑 저장
+            });
+        }
+
+        // 마커 아이콘 결정 헬퍼 함수
+        function getMarkerIcon(types) {
+            if (types.includes('open24')) return 'fa-clock';
+            if (types.includes('quiet')) return 'fa-comment-slash';
+            if (types.includes('plug')) return 'fa-plug';
+            return 'fa-mug-hot';
+        }
+
+        // 마커 CSS 클래스 결정 헬퍼 함수
+        function getMarkerClass(types) {
+            if (types.includes('open24')) return 'open24';
+            if (types.includes('quiet')) return 'quiet';
+            if (types.includes('plug')) return 'plug';
+            return '';
+        }
+
+        // 8. 필터링 데이터 추출 함수
+        function getFilteredData() {
+            return loadedCafes.filter(cafe => {
+                const matchesFilter = currentFilter === 'all' || cafe.type.includes(currentFilter);
+                const matchesSearch = !searchQuery || 
+                    cafe.name.toLowerCase().includes(searchQuery) ||
+                    cafe.review.toLowerCase().includes(searchQuery) ||
+                    cafe.tip.toLowerCase().includes(searchQuery) ||
+                    cafe.time.toLowerCase().includes(searchQuery);
+                return matchesFilter && matchesSearch;
+            });
+        }
+
+        // 9. 좌측 리스트뷰 렌더링
+        function renderCafeList() {
+            const listContainer = document.getElementById('cafe-list');
+            const countBadge = document.getElementById('cafe-count');
+            listContainer.innerHTML = '';
+
+            const filteredData = getFilteredData();
+            countBadge.innerText = `${filteredData.length}개`;
+
+            if (filteredData.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="no-results">
+                        <i class="fa-solid fa-square-minus"></i>
+                        <p>해당 조건에 맞는 카공 공간이 없습니다.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            filteredData.forEach(cafe => {
+                const item = document.createElement('div');
+                item.className = 'cafe-item';
+                item.id = `item-${cafe.id}`;
+                
+                // 도보 정보 파싱
+                const simpleTime = cafe.time.split('/')[0].trim();
+
+                item.innerHTML = `
+                    <div class="cafe-item-header">
+                        <span class="cafe-item-name">${cafe.name}</span>
+                        <span class="cafe-item-time"><i class="fa-solid fa-person-walking"></i> ${simpleTime}</span>
+                    </div>
+                    <p class="cafe-item-review">${cafe.review}</p>
+                    <div class="cafe-item-tags">
+                        ${cafe.type.map(t => {
+                            const name = t === 'plug' ? '🔌 콘센트' : t === 'quiet' ? '🤫 조용함' : '⏰ 24시';
+                            return `<span class="tag-mini ${t}">${name}</span>`;
+                        }).join('')}
+                    </div>
+                `;
+
+                // 클릭 시 해당 마커 클릭과 동일하게 동작
+                item.addEventListener('click', () => {
+                    const marker = markerMap[cafe.id];
+                    showCafeDetail(cafe, marker);
+                    
+                    // 사이드바 아이템 강조
+                    document.querySelectorAll('.cafe-item').forEach(el => el.classList.remove('active-item'));
+                    item.classList.add('active-item');
+                });
+
+                listContainer.appendChild(item);
+            });
+        }
+
+        // UI 갱신 일괄처리
+        function updateUI() {
+            renderMarkers();
+            renderCafeList();
+        }
+
+        // 10. 검색창 기능 구현
+        function handleSearch(event) {
+            searchQuery = event.target.value.toLowerCase().trim();
+            updateUI();
+            closeModal();
+        }
+
+        // 11. 필터 토글 제어
+        function toggleFilter(filterType, btn) {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentFilter = filterType;
+            updateUI();
+            closeModal();
+        }
+
+        // 12. 상세정보 모달 슬라이드 업 & 카메라 플라이투
+        function showCafeDetail(cafe, marker) {
+            // 모든 핀 초기화 및 선택 핀 강조
+            document.querySelectorAll('.marker-pin').forEach(pin => pin.classList.remove('active'));
+            
+            if (marker) {
+                const pinElement = marker.getElement().querySelector('.marker-pin');
+                if (pinElement) pinElement.classList.add('active');
+            }
+
+            // 지도 뷰포트 이동 (하단 모달 카드 면적을 고려해 약간의 남쪽 오프셋 추가)
+            const mapOffsetLat = window.innerWidth <= 768 ? 0.0016 : 0.0009;
+            map.flyTo([cafe.lat - mapOffsetLat, cafe.lng], 16.5, {
+                animate: true,
+                duration: 0.8
+            });
+
+            // 데이터 정보 바인딩
+            document.getElementById('modal-title').innerText = cafe.name;
+            document.getElementById('modal-tip').innerHTML = `<i class="fa-solid fa-plug" style="color: #bd5319;"></i><strong>콘센트 정보:</strong> ${cafe.tip}`;
+            document.getElementById('modal-time').innerHTML = `<i class="fa-solid fa-person-walking" style="color: var(--primary-color);"></i><strong>캠퍼스 도보 시간:</strong> ${cafe.time}`;
+            document.getElementById('modal-review').innerHTML = `<i class="fa-solid fa-quote-left" style="color: var(--text-light); font-size: 11px;"></i><strong>학생 솔직리뷰:</strong> ${cafe.review}`;
+
+            // 태그 바인딩
+            const tagsContainer = document.getElementById('modal-tags');
+            tagsContainer.innerHTML = '';
+            cafe.type.forEach(t => {
+                const tagSpan = document.createElement('span');
+                tagSpan.className = `tag ${t}`;
+                tagSpan.innerText = t === 'plug' ? '#콘센트_풍부' : t === 'quiet' ? '#학업_집중분위기' : '#24시_운영';
+                tagsContainer.appendChild(tagSpan);
+            });
+
+            // 모달 노출 활성화
+            document.getElementById('cafe-modal').classList.add('active');
+
+            // 사이드바 리스트 스크롤 연동 강조
+            document.querySelectorAll('.cafe-item').forEach(el => el.classList.remove('active-item'));
+            const sideItem = document.getElementById(`item-${cafe.id}`);
+            if (sideItem) {
+                sideItem.classList.add('active-item');
+                sideItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            // 모바일 뷰일 경우 리스트 접기
+            if (window.innerWidth <= 768) {
+                const sidebar = document.getElementById('sidebar');
+                if (sidebar.classList.contains('active')) {
+                    toggleSidebarMobile();
+                }
+            }
+        }
+
+        // 모달 닫기
+        function closeModal() {
+            document.getElementById('cafe-modal').classList.remove('active');
+            document.querySelectorAll('.marker-pin').forEach(pin => pin.classList.remove('active'));
+            document.querySelectorAll('.cafe-item').forEach(el => el.classList.remove('active-item'));
+        }
+
+        // 13. 모바일 사이드바 토글
+        function toggleSidebarMobile() {
+            const sidebar = document.getElementById('sidebar');
+            const toggleBtn = document.getElementById('list-toggle-btn');
+            
+            sidebar.classList.toggle('active');
+
+            if (sidebar.classList.contains('active')) {
+                toggleBtn.innerHTML = '<i class="fa-solid fa-map"></i> 지도 보기';
+                closeModal();
+            } else {
+                toggleBtn.innerHTML = '<i class="fa-solid fa-list"></i> 목록 보기';
+            }
+        }
+
+        // 14. 유틸리티 함수: Haversine 공식 거리 계산
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // 지구 반지름 (km)
+            const dLat = deg2rad(lat2 - lat1);
+            const dLon = deg2rad(lon2 - lon1);
+            const a = 
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c * 1000; // 미터 단위 거리
+        }
+
+        function deg2rad(deg) {
+            return deg * (Math.PI / 180);
+        }
+
+        // 15. 커스텀 토스트 알림 헬퍼 함수
+        function showToast(message, icon = 'fa-circle-info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i><span>${message}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.remove();
+            }, 3200);
+        }
+
+        // 문서 로드 즉시 지도 및 앱 구동
+        window.onload = initMap;
+    </script>
+</body>
+</html>
